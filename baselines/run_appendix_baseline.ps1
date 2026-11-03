@@ -31,6 +31,11 @@ if ([string]::IsNullOrWhiteSpace($CactiEmbeddingRoot)) {
 
 $MethodKey = $Method.ToLowerInvariant()
 $MethodOutput = Join-Path $OutputRoot $MethodKey
+$MaskType = @{
+    MCAR = "MCAR_v2_strict"
+    MAR  = "MAR_logistic_v2_strict"
+    MNAR = "MNAR_logistic_T2_v2_strict_hard"
+}[$Mechanism]
 $Common = @(
     "--datasets"
 ) + $Datasets + @(
@@ -69,7 +74,7 @@ try {
         "ReMasker" {
             Set-OfficialPythonPath "remasker" | Out-Null
             $Args = $Common + @(
-                "--mask-type", $Mechanism, "--splits"
+                "--mask-type", $MaskType, "--splits"
             ) + $Splits + @(
                 "--batch-size", "64", "--blr", "0.001", "--weight-decay", "0.01",
                 "--mask-ratio", "0.5", "--warmup-epochs", "40", "--min-lr", "0.00001",
@@ -81,7 +86,7 @@ try {
         "PMAE" {
             Set-OfficialPythonPath "pmae" | Out-Null
             $Args = $Common + @(
-                "--mask-type", $Mechanism, "--splits"
+                "--mask-type", $MaskType, "--splits"
             ) + $Splits + @(
                 "--batch-size", "64", "--blr", "0.001", "--weight-decay", "0.01",
                 "--pmae-a", "0.05", "--pmae-b", "0.5", "--warmup-epochs", "40",
@@ -94,7 +99,7 @@ try {
             $CactiRoot = Set-OfficialPythonPath "cacti"
             $env:CACTI_SOURCE_ROOT = $CactiRoot
             $Args = $Common + @(
-                "--mask-type", $Mechanism, "--splits"
+                "--mask-type", $MaskType, "--splits"
             ) + $Splits + @(
                 "--embedding-root", $CactiEmbeddingRoot, "--batch-size", "128",
                 "--embed-dim", "64", "--nencoder", "10", "--ndecoder", "4",
@@ -111,7 +116,7 @@ try {
                 "--datasets"
             ) + $Datasets + @(
                 "--data-root", $DataRoot, "--output-root", $MethodOutput,
-                "--mask-types", $Mechanism, "--ratio", "$Ratio", "--split-idxs"
+                "--mask-types", $MaskType, "--ratio", "$Ratio", "--split-idxs"
             ) + $Splits + @(
                 "--seed", "$Seed", "--batch-size", "128", "--hint-rate", "0.9",
                 "--alpha", "100", "--learning-rate", "0.001", "--max-epochs", "600",
@@ -123,7 +128,7 @@ try {
             Set-OfficialPythonPath "miwae" | Out-Null
             foreach ($Split in $Splits) {
                 $Args = $Common + @(
-                    "--mask-type", $Mechanism, "--split-idx", "$Split", "--batch-size", "64",
+                    "--mask-type", $MaskType, "--split-idx", "$Split", "--batch-size", "64",
                     "--n-hidden", "128", "--n-samples", "20", "--model-kind", "miwae",
                     "--out-dist", "t", "--selection-impute-samples", "1000",
                     "--final-impute-samples", "10000", "--max-epochs", "600",
@@ -136,7 +141,7 @@ try {
             $DsanRoot = Set-OfficialPythonPath "dsan"
             $env:DSAN_SOURCE_ROOT = $DsanRoot
             $Args = $Common + @(
-                "--mask-type", $Mechanism, "--splits"
+                "--mask-type", $MaskType, "--splits"
             ) + $Splits + @(
                 "--batch-size", "128", "--noise-percent", "30", "--rep-dim", "32",
                 "--num-heads", "8", "--n-hidden", "2", "--dropout", "0.5",
@@ -149,7 +154,7 @@ try {
             $DeepRoot = Set-OfficialPythonPath "deepifsac"
             $env:DEEPIFSAC_SOURCE_ROOT = $DeepRoot
             $Args = $Common + @(
-                "--mask-type", $Mechanism, "--splits"
+                "--mask-type", $MaskType, "--splits"
             ) + $Splits + @(
                 "--batch-size", "128", "--eval-batch-size", "128", "--lr", "0.0001",
                 "--weight-decay", "0.01", "--embedding-size", "32",
@@ -166,7 +171,7 @@ try {
         }
         "MICE" {
             $Args = $Common + @(
-                "--mask-type", $Mechanism, "--splits"
+                "--mask-type", $MaskType, "--splits"
             ) + $Splits + @(
                 "--max-iterations", "10", "--mice-categorical-method", "default"
             )
@@ -174,7 +179,7 @@ try {
         }
         "MissForest" {
             $Args = $Common + @(
-                "--mask-type", $Mechanism, "--splits"
+                "--mask-type", $MaskType, "--splits"
             ) + $Splits + @(
                 "--max-iterations", "10", "--rf-estimators", "100"
             )

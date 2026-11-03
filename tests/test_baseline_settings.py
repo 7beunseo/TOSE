@@ -57,6 +57,20 @@ class BaselineSettingsTests(unittest.TestCase):
         self.assertIn('default="t"', miwae)
         self.assertIn("default=0.3", deepifsac)
 
+    def test_public_mechanisms_map_to_prepared_mask_directories(self):
+        launcher = (ROOT / "baselines" / "run_appendix_baseline.ps1").read_text()
+        self.assertIn('MCAR = "MCAR_v2_strict"', launcher)
+        self.assertIn('MAR  = "MAR_logistic_v2_strict"', launcher)
+        self.assertIn('MNAR = "MNAR_logistic_T2_v2_strict_hard"', launcher)
+        self.assertNotIn('"--mask-type", $Mechanism', launcher)
+        self.assertNotIn('"--mask-types", $Mechanism', launcher)
+
+    def test_gain_uses_scalar_categorical_adapter(self):
+        gain = (ROOT / "baselines" / "GAIN" / "run_gain_native_categorical_benchmark.py").read_text()
+        self.assertIn("class BaselineScalarCategoricalAdapter", gain)
+        self.assertIn('"method": "ordinal_scalar_minmax"', gain)
+        self.assertNotIn("class BaselineOneHotCategoricalAdapter", gain)
+
     def test_official_source_locks_are_full_hashes(self):
         sources = json.loads((ROOT / "baselines" / "official_sources.json").read_text())
         self.assertEqual(set(sources), {"remasker", "pmae", "cacti", "gain", "miwae", "dsan", "deepifsac"})

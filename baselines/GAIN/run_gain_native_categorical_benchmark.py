@@ -243,27 +243,23 @@ class StrictNumericStandardizer:
         }
 
 
-class BaselineOneHotCategoricalAdapter:
-    """GAIN baseline adapter: one-hot input and argmax decoding to original labels.
-
-    This intentionally does not use Eunseo binary codebooks, codebook losses, or
-    codebook argmax decoding.
-    """
+class BaselineScalarCategoricalAdapter:
+    """Encode each categorical feature as one Min-Max-scaled ordinal scalar."""
 
     def __init__(self) -> None:
         self.vocabularies_: list[list[str]] = []
         self.feature_names_: list[str] = []
-        self.widths_: list[int] = []
+        self.cardinalities_: list[int] = []
 
     def fit(
         self,
         train_cat: np.ndarray,
         train_cat_missing: np.ndarray,
         feature_names: list[str],
-    ) -> "BaselineOneHotCategoricalAdapter":
+    ) -> "BaselineScalarCategoricalAdapter":
         self.feature_names_ = list(feature_names)
         self.vocabularies_ = []
-        self.widths_ = []
+        self.cardinalities_ = []
         for col in range(train_cat.shape[1]):
             observed = train_cat[~train_cat_missing[:, col], col].astype(str)
             if observed.size == 0:
@@ -272,46 +268,36 @@ class BaselineOneHotCategoricalAdapter:
             if not vocab:
                 vocab = ["__UNK__"]
             self.vocabularies_.append(vocab)
-            self.widths_.append(len(vocab))
+            self.cardinalities_.append(len(vocab))
         return self
 
     @property
     def output_dim(self) -> int:
-        return int(sum(self.widths_))
+        return len(self.vocabularies_)
 
     def transform(self, values: np.ndarray) -> np.ndarray:
         if values.shape[1] == 0:
             return np.empty((values.shape[0], 0), dtype=np.float32)
-        chunks = []
+        encoded = np.zeros(values.shape, dtype=np.float32)
         for col, vocab in enumerate(self.vocabularies_):
             lookup = {value: idx for idx, value in enumerate(vocab)}
-            encoded = np.zeros((values.shape[0], len(vocab)), dtype=np.float32)
             for row, raw_value in enumerate(values[:, col].astype(str)):
                 idx = lookup.get(raw_value)
                 if idx is not None:
-                    encoded[row, idx] = 1.0
-            chunks.append(encoded)
-        return np.concatenate(chunks, axis=1).astype(np.float32)
+                    encoded[row, col] = float(idx) / float(max(1, len(vocab) - 1))
+        return encoded
 
     def expand_missing_mask(self, cat_missing: np.ndarray) -> np.ndarray:
-        if cat_missing.shape[1] == 0:
-            return np.empty((cat_missing.shape[0], 0), dtype=bool)
-        chunks = []
-        for col, width in enumerate(self.widths_):
-            chunks.append(np.repeat(cat_missing[:, col : col + 1], width, axis=1))
-        return np.concatenate(chunks, axis=1).astype(bool)
+        return cat_missing.astype(bool, copy=True)
 
-    def inverse_transform_predictions(self, pred_onehot: np.ndarray) -> np.ndarray:
+    def inverse_transform_predictions(self, pred_scalar: np.ndarray) -> np.ndarray:
         if not self.vocabularies_:
-            return np.empty((pred_onehot.shape[0], 0), dtype=object)
+            return np.empty((pred_scalar.shape[0], 0), dtype=object)
         columns = []
-        start = 0
-        for vocab, width in zip(self.vocabularies_, self.widths_):
-            end = start + width
-            block = pred_onehot[:, start:end]
-            idx = np.argmax(block, axis=1)
+        for col, vocab in enumerate(self.vocabularies_):
+            idx = np.rint(pred_scalar[:, col] * float(max(1, len(vocab) - 1))).astype(np.int64)
+            idx = np.clip(idx, 0, len(vocab) - 1)
             columns.append(np.asarray([vocab[int(i)] for i in idx], dtype=object))
-            start = end
         return np.stack(columns, axis=1)
 
     def column_prefixed_category_index_tokens(self, values: np.ndarray, original_col_idx: list[int]) -> np.ndarray:
@@ -327,14 +313,15 @@ class BaselineOneHotCategoricalAdapter:
 
     def metadata(self) -> dict[str, Any]:
         return {
-            "method": "baseline_native_one_hot",
+            "method": "ordinal_scalar_minmax",
             "fit_scope": "strict_train_observed_categories_only",
-            "decoding": "argmax_within_each_one_hot_feature_to_original_label",
+            "encoding": "category_index / max(1, cardinality - 1)",
+            "decoding": "inverse_minmax_then_round_and_clip_to_original_label",
             "f1_metric": "column_prefixed_category_index_weighted_f1",
             "uses_eunseo_codebook": False,
             "uses_cat_bin_num": False,
             "uses_codebook_loss": False,
-            "vocabulary_sizes": list(self.widths_),
+            "vocabulary_sizes": list(self.cardinalities_),
             "feature_names": list(self.feature_names_),
         }
 
@@ -351,7 +338,7 @@ class BaselinePreprocessor:
         self.num_col_idx = list(num_col_idx)
         self.cat_col_idx = list(cat_col_idx)
         self.numeric = StrictNumericStandardizer()
-        self.categorical = BaselineOneHotCategoricalAdapter()
+        self.categorical = BaselineScalarCategoricalAdapter()
         self.cat_feature_names = list(cat_feature_names)
         self.numeric_mean = numeric_mean
         self.numeric_std = numeric_std
@@ -1066,7 +1053,7 @@ class GainNativeCategoricalRunner:
     ) -> dict[str, Any]:
         return {
             "model": "GAIN",
-            "baseline_protocol": "native_categorical_one_hot_no_eunseo_codebook",
+            "baseline_protocol": "official_gain_with_ordinal_scalar_categorical_adapter",
             "numeric_source": "prepared_npz_x_norm",
             "scaler_source": "prepared_npz_mean_std",
             "metric_space": "eunseo_normalized",
@@ -1155,8 +1142,9 @@ class GainNativeCategoricalRunner:
 
 PAPER_PROTOCOL_SENTENCE = (
     "Numeric variables use prepared npz train_x_norm/valid_x_norm/test_x_norm values "
-    "with prepared mean/std metadata. Categorical variables follow GAIN's native "
-    "one-hot representation. Final metrics are computed in the common evaluation "
+    "with prepared mean/std metadata. Each categorical variable is represented by "
+    "one Min-Max-scaled ordinal scalar and decoded by inverse scaling, rounding, and "
+    "clipping. Final metrics are computed in the common evaluation "
     "space: numeric RMSE/MAE on prepared normalized values and categorical weighted "
     "F1/accuracy on column-prefixed category-index labels over masked positions."
 )
@@ -1237,7 +1225,7 @@ def write_reports_csv(path: Path, reports: list[dict[str, Any]]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run GAIN with native one-hot categorical baseline handling.")
+    parser = argparse.ArgumentParser(description="Run official GAIN with scalar categorical adaptation.")
     public_root = Path(__file__).resolve().parents[2]
     parser.add_argument("--data-root", default=str(public_root / "data"))
     parser.add_argument(
@@ -1253,6 +1241,9 @@ def parse_args() -> argparse.Namespace:
             "MCAR",
             "MAR",
             "MNAR",
+            "MCAR_v2_strict",
+            "MAR_logistic_v2_strict",
+            "MNAR_logistic_T2_v2_strict_hard",
         ],
     )
     parser.add_argument("--ratio", default="30")
