@@ -29,8 +29,8 @@ if ([string]::IsNullOrWhiteSpace($DataRoot)) {
     $DataRoot = Join-Path $RepoRoot "data"
 }
 
-$HardGenerator = Join-Path $ScriptDir "build_hard_mnar_v2_strict_dataset.py"
-$McarMarGenerator = Join-Path $ScriptDir "build_strict_mcar_mar.py"
+$HardGenerator = Join-Path $ScriptDir "generate_mnar.py"
+$McarMarGenerator = Join-Path $ScriptDir "generate_mcar_mar.py"
 
 foreach ($requiredPath in @($HardGenerator, $McarMarGenerator)) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
@@ -106,7 +106,7 @@ for ($rateIndex = 0; $rateIndex -lt $orderedRates.Count; $rateIndex++) {
     if ($OverwriteMasks) {
         $hardArgs += "--overwrite-masks"
     }
-    Invoke-Generator -Label "strict MNAR-T2 rate$rate" -Arguments $hardArgs
+    Invoke-Generator -Label "MNAR rate$rate" -Arguments $hardArgs
 
     # At 70% overall MAR, 30% always-observed predictors leave too few target
     # cells. The released benchmark therefore uses 20% predictors at rate70.
@@ -137,7 +137,7 @@ for ($rateIndex = 0; $rateIndex -lt $orderedRates.Count; $rateIndex++) {
     if ($OverwriteMasks) {
         $mcarMarArgs += "--overwrite-masks"
     }
-    Invoke-Generator -Label "strict MCAR/MAR rate$rate" -Arguments $mcarMarArgs
+    Invoke-Generator -Label "MCAR/MAR rate$rate" -Arguments $mcarMarArgs
 }
 
-Write-Host "[done] strict MCAR, MAR, and MNAR-T2 benchmark generation complete"
+Write-Host "[done] MCAR, MAR, and MNAR benchmark generation complete"

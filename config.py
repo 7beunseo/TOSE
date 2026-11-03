@@ -83,7 +83,7 @@ def get_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--datasets", nargs="*", default=DEFAULT_DATASETS)
     parser.add_argument("--splits", nargs="*", type=int, default=[0])
-    parser.add_argument("--mask-type", type=str, default="MCAR_v2_strict")
+    parser.add_argument("--mask-type", type=str, default="MCAR")
     parser.add_argument("--ratio", type=str, default="30")
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)

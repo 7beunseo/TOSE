@@ -31,8 +31,8 @@ DEFAULT_DATASETS = [
     "mushroom",
 ]
 
-MCAR_MASK = "MCAR_v2_strict"
-MAR_MASK = "MAR_logistic_v2_strict"
+MCAR_MASK = "MCAR"
+MAR_MASK = "MAR"
 
 
 @dataclass
@@ -56,8 +56,7 @@ def parse_args() -> argparse.Namespace:
     here = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(
         description=(
-            "Generate strict MCAR and logistic-MAR masks using the same split, "
-            "normalization, and file protocol as the TOSE strict benchmark."
+            "Generate corrected MCAR and logistic-MAR masks for TOSE."
         )
     )
     parser.add_argument("--support-dir", type=Path, default=here)
@@ -538,7 +537,7 @@ def main() -> None:
                     split_idx=split_idx,
                     mechanism_name=mechanism_name,
                 )
-    print("[done] strict MCAR/MAR generation complete")
+    print("[done] MCAR/MAR generation complete")
 
 
 if __name__ == "__main__":

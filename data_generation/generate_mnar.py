@@ -27,15 +27,15 @@ DEFAULT_DATASETS = [
     "mushroom",
 ]
 
-T2_HARD_MASK = "MNAR_logistic_T2_v2_strict_hard"
-SELF_HARD_MASK = "MNAR_self_logistic_v2_strict_hard"
+T2_HARD_MASK = "MNAR"
+SELF_HARD_MASK = "MNAR_self_logistic"
 GERMAN_DATA_URL = "https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/german/german.data"
 
 
 def parse_args() -> argparse.Namespace:
     here = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(
-        description="Build the strict MNAR-T2 benchmark for TOSE."
+        description="Generate the corrected MNAR benchmark for TOSE."
     )
     parser.add_argument("--support-dir", type=Path, default=here)
     parser.add_argument("--output-root", type=Path, default=here.parent / "data" / "hard_mnar")
@@ -262,7 +262,7 @@ def save_hard_mask_metadata(save_dir: Path, split_idx: int, dataset: str, mask_n
         "coeffs": mechanism.coeffs.tolist(),
         "intercepts": mechanism.intercepts.tolist(),
         "notes": [
-            "Hard MNAR stress-test setting separated from the main v2_strict benchmark.",
+            "MNAR stress-test setting used by the benchmark.",
             "The supervised target is excluded before missingness generation.",
             "Mechanism standardization and calibration use strict-train rows only.",
             "The same mechanism is applied to train/valid/test.",
