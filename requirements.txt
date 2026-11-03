@@ -1,0 +1,9 @@
+numpy
+openpyxl
+pandas
+scipy
+scikit-learn
+torch
+tqdm
+Pillow
+xlrd

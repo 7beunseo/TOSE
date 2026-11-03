@@ -1,0 +1,34 @@
+# Generated experiment artifacts
+results/
+analysis_outputs/
+checkpoints/
+plots/
+data/
+.public_smoke_data/
+.public_smoke_results/
+
+# Model weights and array dumps
+*.pt
+*.pth
+*.ckpt
+*.npy
+*.npz
+
+# Python and test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environments and editor files
+.venv/
+venv/
+.env
+.vscode/
+.idea/
+
+# Runtime files
+*.log
+*.tmp
+*.lock
