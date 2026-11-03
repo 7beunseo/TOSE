@@ -83,7 +83,8 @@ This release corrects two issues found while auditing the research pipeline:
    feature missing rate away from 30%.
 2. Earlier MAR/MNAR calibration used concatenated train and test covariates.
    The public generator fits standardization, coefficients, and intercepts on
-   training rows only and never uses test rates to select a mechanism.
+   training rows only. The mechanism is fixed before validation and test are
+   processed, and neither split is used to select mechanism parameters.
 
 The corrected generator samples the nearest feasible exact number of missing
 logical cells independently in train, validation, and test. Logistic
@@ -115,9 +116,15 @@ rates, and MAR predictor observability.
 
 ## Reproducibility notes
 
+- The row-level train/validation/test partition is fixed across repetitions.
+  Repetition indices denote independently generated missingness masks and
+  training seeds, not independently redrawn row partitions.
 - Normalization statistics are estimated from observed training cells
   only and then applied unchanged to validation and test.
 - Checkpoints are selected using validation data only.
 - Categorical masks operate at the original logical-variable level; all binary
   code bits belonging to one categorical variable share the same mask.
+- Categorical domains are treated as dataset schema. Their labels are read from
+  the complete released table, but test category frequencies and values are not
+  used to estimate normalization or model parameters.
 - Repetition summaries use the sample standard deviation (`ddof=1`).

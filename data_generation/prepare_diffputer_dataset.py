@@ -519,23 +519,18 @@ def train_test_split(dataname: str, ratio: float = DEFAULT_TRAIN_RATIO) -> None:
     with open(info_path, "r", encoding="utf-8") as f:
         info = json.load(f)
 
-    cat_idx = info["cat_col_idx"]
+    feature_indices = sorted(set(info["num_col_idx"]) | set(info["cat_col_idx"]))
     data_df = pd.read_csv(path)
-    total_num = data_df.shape[0]
-
-    if len(cat_idx) == 0:
-        data_values = data_df.values[:, :-1].astype(np.float32)
-        nan_idx = np.isnan(data_values).nonzero()[0]
-        keep_idx = list(set(np.arange(data_values.shape[0])) - set(list(nan_idx)))
-        keep_idx = np.array(keep_idx)
-    else:
-        keep_idx = np.arange(total_num)
+    if not feature_indices:
+        raise ValueError(f"Dataset {dataname!r} has no input features")
+    keep_idx = np.flatnonzero(
+        ~data_df.iloc[:, feature_indices].isna().any(axis=1).to_numpy()
+    )
 
     num_train = int(keep_idx.shape[0] * ratio)
-    num_test = total_num - num_train
+    num_test = keep_idx.shape[0] - num_train
 
-    np.random.seed(1234)
-    np.random.shuffle(keep_idx)
+    keep_idx = np.random.default_rng(1234).permutation(keep_idx)
 
     train_idx = keep_idx[:num_train]
     test_idx = keep_idx[-num_test:]

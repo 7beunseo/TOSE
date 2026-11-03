@@ -8,6 +8,8 @@ import pandas as pd
 
 from data_generation import normalize_diffputer_preprocessed as normalize
 from data_generation import prepare_diffputer_dataset as prepare
+from data_generation import dataset_v2
+from data_generation.generate_mcar_mar import draw_mar_mechanism
 from data_generation.strict_masking import sample_exact_split_masks
 
 
@@ -104,6 +106,49 @@ class ExactMaskingTest(unittest.TestCase):
         )
         self.assertFalse(result.train_mask[:, :2].any())
         self.assertFalse(result.test_mask[:, :2].any())
+
+
+class MechanismIsolationTest(unittest.TestCase):
+    def test_mar_parameters_do_not_depend_on_validation_or_test_values(self):
+        rng = np.random.default_rng(19)
+        strict_train = rng.normal(size=(18, 5))
+        validation_a = rng.normal(size=(6, 5))
+        validation_b = validation_a * 100.0 + 50.0
+        train_a = np.concatenate([strict_train, validation_a], axis=0)
+        train_b = np.concatenate([strict_train, validation_b], axis=0)
+        split = dataset_v2.SplitIndices(
+            train_idx=np.arange(18), valid_idx=np.arange(18, 24)
+        )
+
+        kwargs = dict(
+            split_indices=split,
+            missing_rate=0.30,
+            observed_fraction=0.30,
+            logit_strength=1.0,
+            max_expected_gap=0.0,
+            max_tries=20,
+            v2=dataset_v2,
+        )
+        mechanism_a = draw_mar_mechanism(
+            train_x=train_a,
+            test_x=np.zeros((7, 5)),
+            rng=np.random.default_rng(77),
+            **kwargs,
+        )
+        mechanism_b = draw_mar_mechanism(
+            train_x=train_b,
+            test_x=np.full((7, 5), 999.0),
+            rng=np.random.default_rng(77),
+            **kwargs,
+        )
+
+        np.testing.assert_array_equal(
+            mechanism_a.predictor_indices, mechanism_b.predictor_indices
+        )
+        np.testing.assert_allclose(mechanism_a.centers, mechanism_b.centers)
+        np.testing.assert_allclose(mechanism_a.scales, mechanism_b.scales)
+        np.testing.assert_allclose(mechanism_a.coeffs, mechanism_b.coeffs)
+        np.testing.assert_allclose(mechanism_a.intercepts, mechanism_b.intercepts)
 
 
 if __name__ == "__main__":

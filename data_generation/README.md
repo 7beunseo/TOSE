@@ -11,12 +11,17 @@ For every dataset and repetition:
 2. Rows are split into a 70% training candidate and a 30% test set. Up to 15%
    of the training candidate is reserved for validation.
 3. MAR/MNAR standardization, coefficient scaling, and intercept calibration use
-   training rows only.
-4. The fixed mechanism is applied to train, validation, and test. Test
-   values and test missing rates do not participate in mechanism selection.
+   training rows only. The mechanism is fixed before validation and test are
+   processed.
+4. The fixed mechanism is applied to train, validation, and test. Neither
+   validation nor test values participate in mechanism selection.
 5. Each partition receives `round(rho * N * D)` missing logical cells. MCAR uses
    uniform weights; MAR/MNAR use their logistic probabilities as relative
    weights for sampling without replacement.
+
+The row-level train/validation/test partition is fixed across repetitions.
+Repetition indices generate different missingness masks; they do not redraw the
+row partition.
 6. Numerical normalization uses observed training cells only.
 7. A categorical variable is one logical feature during masking. Its complete
    binary code is masked or observed together.

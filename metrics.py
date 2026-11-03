@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from sklearn.metrics import f1_score
 
-from dataset import BenchmarkMNARBundle
+from dataset import BenchmarkBundle
 
 
 def _log_sigmoid_np(values: np.ndarray) -> np.ndarray:
@@ -112,7 +112,7 @@ class PredictionBundle:
 
 
 def compose_raw_prediction(
-    bundle: BenchmarkMNARBundle,
+    bundle: BenchmarkBundle,
     split_name: str,
     pred_num_std: torch.Tensor,
     pred_cat_logits: torch.Tensor,
@@ -167,7 +167,7 @@ def compose_raw_prediction(
 
 
 def compute_forward_metrics(
-    bundle: BenchmarkMNARBundle,
+    bundle: BenchmarkBundle,
     split_name: str,
     prediction: PredictionBundle,
 ) -> dict[str, float]:
@@ -187,10 +187,27 @@ def compute_forward_metrics(
         metrics["mse"] = float(np.mean(diff**2))
         metrics["rmse"] = float(np.sqrt(metrics["mse"]))
         metrics["mae"] = float(np.mean(np.abs(diff)))
+        r2_values = []
+        for column in range(bundle.num_dim):
+            column_mask = num_mask[:, column]
+            if int(column_mask.sum()) < 2:
+                continue
+            y_true = true_norm[:, column][column_mask].astype(np.float64)
+            y_pred = pred_num_norm[:, column][column_mask].astype(np.float64)
+            if not np.isfinite(y_true).all() or not np.isfinite(y_pred).all():
+                r2_values = []
+                break
+            denominator = float(np.sum((y_true - y_true.mean()) ** 2))
+            if denominator <= np.finfo(np.float64).eps:
+                continue
+            numerator = float(np.sum((y_true - y_pred) ** 2))
+            r2_values.append(1.0 - numerator / denominator)
+        metrics["r2"] = float(np.mean(r2_values)) if r2_values else float("nan")
     else:
         metrics["mse"] = float("nan")
         metrics["rmse"] = float("nan")
         metrics["mae"] = float("nan")
+        metrics["r2"] = float("nan")
 
     cat_mask = missing_ext[:, bundle.num_dim :]
     if bundle.bit_dim > 0 and cat_mask.sum() > 0:
@@ -262,6 +279,8 @@ def compute_forward_metrics(
 
     metrics["MAE"] = metrics["mae"]
     metrics["RMSE"] = metrics["rmse"]
+    metrics["NRMSE"] = metrics["rmse"]
+    metrics["R2"] = metrics["r2"]
     metrics["F1"] = metrics["cat_f1"]
     metrics["Accuracy"] = metrics["cat_accuracy"]
     metrics["numeric_source"] = "prepared_npz_x_norm"

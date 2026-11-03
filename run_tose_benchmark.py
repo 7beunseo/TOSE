@@ -28,6 +28,7 @@ def write_summary_csv(path: Path, reports: list[dict]) -> None:
                 "best_epoch",
                 "test_rmse",
                 "test_mae",
+                "test_r2",
                 "test_bit_f1",
                 "test_cat_accuracy",
             ],
@@ -44,6 +45,7 @@ def write_summary_csv(path: Path, reports: list[dict]) -> None:
                     "best_epoch": None if not best else best.get("epoch"),
                     "test_rmse": test_metrics.get("rmse"),
                     "test_mae": test_metrics.get("mae"),
+                    "test_r2": test_metrics.get("r2"),
                     "test_bit_f1": test_metrics.get("bit_f1"),
                     "test_cat_accuracy": test_metrics.get("cat_accuracy"),
                 }
@@ -79,10 +81,16 @@ def aggregate_reports(reports: list[dict]) -> dict:
             ],
             dtype=np.float64,
         )
+        r2_values = np.array(
+            [report.get("best_report", {}).get("test_metrics", {}).get("r2", np.nan) for report in dataset_reports],
+            dtype=np.float64,
+        )
         summary[dataset] = {
             "num_runs": len(dataset_reports),
             "rmse_mean": None if np.isnan(rmse_values).all() else float(np.nanmean(rmse_values)),
             "rmse_std": sample_standard_deviation(rmse_values),
+            "r2_mean": None if np.isnan(r2_values).all() else float(np.nanmean(r2_values)),
+            "r2_std": sample_standard_deviation(r2_values),
             "bit_f1_mean": None if np.isnan(f1_values).all() else float(np.nanmean(f1_values)),
             "bit_f1_std": sample_standard_deviation(f1_values),
             "cat_accuracy_mean": None if np.isnan(acc_values).all() else float(np.nanmean(acc_values)),

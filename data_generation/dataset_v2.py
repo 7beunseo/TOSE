@@ -180,47 +180,33 @@ def draw_self_logistic_mechanism(
     train_sub_z = standardize(strict_train_x, centers, scales)
     valid_z = standardize(train_x[split_indices.valid_idx].astype(np.float64), centers, scales)
 
-    best: Mechanism | None = None
-    best_score = float("inf")
     d = strict_train_x.shape[1]
-
-    for attempt in range(1, max_tries + 1):
-        coeffs = rng.choice(np.array([-1.0, 1.0]), size=d) * float(effect_scale)
-        intercepts = np.array(
-            [fit_intercept_1d(train_sub_z[:, j], coeffs[j], missing_rate) for j in range(d)],
-            dtype=np.float64,
-        )
-
-        p_train = self_probabilities(train_sub_z, coeffs, intercepts)
-        p_valid = self_probabilities(valid_z, coeffs, intercepts)
-        train_rate = p_train.mean(axis=0)
-        valid_rate = p_valid.mean(axis=0)
-        max_gap = float(np.max(np.abs(train_rate - valid_rate)))
-        score = max_gap
-        if score < best_score:
-            best_score = score
-            best = Mechanism(
-                kind="self_logistic",
-                idxs_params=list(range(d)),
-                idxs_targets=list(range(d)),
-                centers=centers,
-                scales=scales,
-                coeffs=coeffs,
-                intercepts=intercepts,
-                expected_train_rate=train_rate,
-                expected_valid_rate=valid_rate,
-                expected_test_rate=np.empty(d, dtype=np.float64),
-                expected_max_gap=max_gap,
-                tries=attempt,
-            )
-        if max_gap <= max_expected_gap:
-            break
-
-    assert best is not None
-    best.expected_test_rate = mechanism_probabilities(
-        test_x.astype(np.float64), best, missing_rate
+    coeffs = rng.choice(np.array([-1.0, 1.0]), size=d) * float(effect_scale)
+    intercepts = np.array(
+        [fit_intercept_1d(train_sub_z[:, j], coeffs[j], missing_rate) for j in range(d)],
+        dtype=np.float64,
+    )
+    mechanism = Mechanism(
+        kind="self_logistic",
+        idxs_params=list(range(d)),
+        idxs_targets=list(range(d)),
+        centers=centers,
+        scales=scales,
+        coeffs=coeffs,
+        intercepts=intercepts,
+        expected_train_rate=self_probabilities(train_sub_z, coeffs, intercepts).mean(axis=0),
+        expected_valid_rate=self_probabilities(valid_z, coeffs, intercepts).mean(axis=0),
+        expected_test_rate=np.empty(d, dtype=np.float64),
+        expected_max_gap=float("nan"),
+        tries=1,
+    )
+    mechanism.expected_test_rate = mechanism_probabilities(
+        test_x.astype(np.float64), mechanism, missing_rate
     ).mean(axis=0)
-    return best
+    mechanism.expected_max_gap = float(
+        np.max(np.abs(mechanism.expected_train_rate - mechanism.expected_valid_rate))
+    )
+    return mechanism
 
 
 def fit_intercept_linear(linear_term: np.ndarray, target_p: float) -> float:
@@ -252,65 +238,60 @@ def draw_t2_logistic_mechanism(
     train_sub_z = standardize(train_sub_x, centers, scales)
     d = train_sub_x.shape[1]
 
-    best: Mechanism | None = None
-    best_score = float("inf")
+    d_params = max(int(round(float(p_params) * d)), 1)
+    if d_params >= d:
+        d_params = max(d - 1, 1)
+    idxs_params = np.sort(rng.choice(d, size=d_params, replace=False)).astype(np.int64)
+    idxs_targets = np.asarray(
+        [j for j in range(d) if j not in set(idxs_params.tolist())], dtype=np.int64
+    )
+    if idxs_targets.size == 0:
+        idxs_targets = np.arange(d, dtype=np.int64)
 
-    for attempt in range(1, max_tries + 1):
-        d_params = max(int(round(float(p_params) * d)), 1)
-        if d_params >= d:
-            d_params = max(d - 1, 1)
-        idxs_params = np.sort(rng.choice(d, size=d_params, replace=False)).astype(np.int64)
-        idxs_targets = np.asarray([j for j in range(d) if j not in set(idxs_params.tolist())], dtype=np.int64)
-        if idxs_targets.size == 0:
-            idxs_targets = np.arange(d, dtype=np.int64)
+    coeffs = rng.normal(
+        loc=0.0, scale=float(effect_scale), size=(idxs_params.size, idxs_targets.size)
+    )
+    linear_train = train_sub_z[:, idxs_params].dot(coeffs)
+    scale = np.nanstd(linear_train, axis=0, keepdims=True)
+    scale[~np.isfinite(scale)] = 1.0
+    scale[scale < 1e-6] = 1.0
+    coeffs = coeffs / scale
+    linear_train = train_sub_z[:, idxs_params].dot(coeffs)
+    intercepts = np.array(
+        [
+            fit_intercept_linear(linear_train[:, j], missing_rate)
+            for j in range(idxs_targets.size)
+        ],
+        dtype=np.float64,
+    )
 
-        coeffs = rng.normal(loc=0.0, scale=float(effect_scale), size=(idxs_params.size, idxs_targets.size))
-        linear_train = train_sub_z[:, idxs_params].dot(coeffs)
-        scale = np.nanstd(linear_train, axis=0, keepdims=True)
-        scale[~np.isfinite(scale)] = 1.0
-        scale[scale < 1e-6] = 1.0
-        coeffs = coeffs / scale
-        linear_train = train_sub_z[:, idxs_params].dot(coeffs)
-        intercepts = np.array(
-            [fit_intercept_linear(linear_train[:, j], missing_rate) for j in range(idxs_targets.size)],
-            dtype=np.float64,
-        )
-
-        mechanism = Mechanism(
-            kind="logistic_t2",
-            idxs_params=idxs_params.tolist(),
-            idxs_targets=idxs_targets.tolist(),
-            centers=centers,
-            scales=scales,
-            coeffs=coeffs,
-            intercepts=intercepts,
-            expected_train_rate=np.array([]),
-            expected_valid_rate=np.array([]),
-            expected_test_rate=np.array([]),
-            expected_max_gap=float("inf"),
-            tries=attempt,
-        )
-        p_train = mechanism_probabilities(train_sub_x, mechanism, missing_rate)
-        p_valid = mechanism_probabilities(valid_x, mechanism, missing_rate)
-        train_rate = p_train.mean(axis=0)
-        valid_rate = p_valid.mean(axis=0)
-        max_gap = float(np.max(np.abs(train_rate - valid_rate)))
-        mechanism.expected_train_rate = train_rate
-        mechanism.expected_valid_rate = valid_rate
-        mechanism.expected_max_gap = max_gap
-
-        if max_gap < best_score:
-            best_score = max_gap
-            best = mechanism
-        if max_gap <= max_expected_gap:
-            best = mechanism
-            break
-
-    assert best is not None
-    best.expected_test_rate = mechanism_probabilities(
-        test_x.astype(np.float64), best, missing_rate
+    mechanism = Mechanism(
+        kind="logistic_t2",
+        idxs_params=idxs_params.tolist(),
+        idxs_targets=idxs_targets.tolist(),
+        centers=centers,
+        scales=scales,
+        coeffs=coeffs,
+        intercepts=intercepts,
+        expected_train_rate=np.array([]),
+        expected_valid_rate=np.array([]),
+        expected_test_rate=np.array([]),
+        expected_max_gap=float("nan"),
+        tries=1,
+    )
+    mechanism.expected_train_rate = mechanism_probabilities(
+        train_sub_x, mechanism, missing_rate
     ).mean(axis=0)
-    return best
+    mechanism.expected_valid_rate = mechanism_probabilities(
+        valid_x, mechanism, missing_rate
+    ).mean(axis=0)
+    mechanism.expected_test_rate = mechanism_probabilities(
+        test_x.astype(np.float64), mechanism, missing_rate
+    ).mean(axis=0)
+    mechanism.expected_max_gap = float(
+        np.max(np.abs(mechanism.expected_train_rate - mechanism.expected_valid_rate))
+    )
+    return mechanism
 
 
 def rate_gap(train_rate: np.ndarray, valid_rate: np.ndarray, test_rate: np.ndarray) -> float:
@@ -634,13 +615,15 @@ def generate_one_dataset(args: argparse.Namespace, prep, norm, dataset: str) -> 
         )
         if mechanism.expected_max_gap > args.max_expected_gap:
             print(
-                f"[warn] dataset={dataset} split={split_idx} expected gap exceeded threshold "
-                f"({mechanism.expected_max_gap:.4f} > {args.max_expected_gap:.4f}); best candidate was used."
+                f"[diagnostic] dataset={dataset} split={split_idx} train/validation expected gap "
+                f"exceeds the reporting threshold ({mechanism.expected_max_gap:.4f} > "
+                f"{args.max_expected_gap:.4f}); the train-fitted mechanism is unchanged."
             )
         if mask_result.max_gap > args.max_rate_gap:
             print(
-                f"[warn] dataset={dataset} split={split_idx} sampled gap exceeded threshold "
-                f"({mask_result.max_gap:.4f} > {args.max_rate_gap:.4f}); best sample was used."
+                f"[diagnostic] dataset={dataset} split={split_idx} all-split feature-rate gap "
+                f"exceeds the reporting threshold ({mask_result.max_gap:.4f} > "
+                f"{args.max_rate_gap:.4f}); test statistics were not used to reselect the mechanism."
             )
 
         if args.dry_run:

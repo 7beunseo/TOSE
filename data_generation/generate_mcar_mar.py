@@ -172,70 +172,55 @@ def draw_mar_mechanism(
             "MAR observed fraction leaves too few target features for the requested overall missing rate"
         )
 
-    best: StrictMechanism | None = None
-    best_score = float("inf")
     all_indices = np.arange(d, dtype=np.int64)
-    for attempt in range(1, max_tries + 1):
-        predictor_indices = np.sort(
-            rng.choice(d, size=predictor_count, replace=False)
-        ).astype(np.int64)
-        target_indices = np.setdiff1d(all_indices, predictor_indices, assume_unique=True)
+    predictor_indices = np.sort(
+        rng.choice(d, size=predictor_count, replace=False)
+    ).astype(np.int64)
+    target_indices = np.setdiff1d(all_indices, predictor_indices, assume_unique=True)
 
-        coeffs = rng.normal(size=(predictor_count, target_count)).astype(np.float64)
-        linear_train = strict_train_z[:, predictor_indices].dot(coeffs)
-        linear_scale = np.nanstd(linear_train, axis=0)
-        linear_scale[~np.isfinite(linear_scale)] = 1.0
-        linear_scale[linear_scale < 1e-6] = 1.0
-        coeffs = coeffs / linear_scale.reshape(1, -1) * float(logit_strength)
-        linear_train = strict_train_z[:, predictor_indices].dot(coeffs)
-        intercepts = np.asarray(
-            [
-                v2.fit_intercept_linear(linear_train[:, column], target_missing_rate)
-                for column in range(target_count)
-            ],
-            dtype=np.float64,
-        )
+    coeffs = rng.normal(size=(predictor_count, target_count)).astype(np.float64)
+    linear_train = strict_train_z[:, predictor_indices].dot(coeffs)
+    linear_scale = np.nanstd(linear_train, axis=0)
+    linear_scale[~np.isfinite(linear_scale)] = 1.0
+    linear_scale[linear_scale < 1e-6] = 1.0
+    coeffs = coeffs / linear_scale.reshape(1, -1) * float(logit_strength)
+    linear_train = strict_train_z[:, predictor_indices].dot(coeffs)
+    intercepts = np.asarray(
+        [
+            v2.fit_intercept_linear(linear_train[:, column], target_missing_rate)
+            for column in range(target_count)
+        ],
+        dtype=np.float64,
+    )
 
-        candidate = StrictMechanism(
-            kind="mar_logistic",
-            predictor_indices=predictor_indices,
-            target_indices=target_indices,
-            centers=centers,
-            scales=scales,
-            coeffs=coeffs,
-            intercepts=intercepts,
-            expected_train_rate=np.empty(d, dtype=np.float64),
-            expected_valid_rate=np.empty(d, dtype=np.float64),
-            expected_test_rate=np.empty(d, dtype=np.float64),
-            expected_max_gap=float("inf"),
-            tries=attempt,
-            target_missing_rate=target_missing_rate,
-        )
-        train_probabilities = mechanism_probabilities(
-            strict_train_x, candidate, missing_rate, v2
-        )
-        valid_probabilities = mechanism_probabilities(valid_x, candidate, missing_rate, v2)
-        candidate.expected_train_rate = train_probabilities.mean(axis=0)
-        candidate.expected_valid_rate = valid_probabilities.mean(axis=0)
-        candidate.expected_max_gap = float(
-            np.max(
-                np.abs(
-                    candidate.expected_train_rate - candidate.expected_valid_rate
-                )
-            )
-        )
-        if candidate.expected_max_gap < best_score:
-            best = candidate
-            best_score = candidate.expected_max_gap
-        if candidate.expected_max_gap <= max_expected_gap:
-            best = candidate
-            break
-
-    assert best is not None
-    best.expected_test_rate = mechanism_probabilities(
-        test_x, best, missing_rate, v2
+    mechanism = StrictMechanism(
+        kind="mar_logistic",
+        predictor_indices=predictor_indices,
+        target_indices=target_indices,
+        centers=centers,
+        scales=scales,
+        coeffs=coeffs,
+        intercepts=intercepts,
+        expected_train_rate=np.empty(d, dtype=np.float64),
+        expected_valid_rate=np.empty(d, dtype=np.float64),
+        expected_test_rate=np.empty(d, dtype=np.float64),
+        expected_max_gap=float("nan"),
+        tries=1,
+        target_missing_rate=target_missing_rate,
+    )
+    mechanism.expected_train_rate = mechanism_probabilities(
+        strict_train_x, mechanism, missing_rate, v2
     ).mean(axis=0)
-    return best
+    mechanism.expected_valid_rate = mechanism_probabilities(
+        valid_x, mechanism, missing_rate, v2
+    ).mean(axis=0)
+    mechanism.expected_test_rate = mechanism_probabilities(
+        test_x, mechanism, missing_rate, v2
+    ).mean(axis=0)
+    mechanism.expected_max_gap = float(
+        np.max(np.abs(mechanism.expected_train_rate - mechanism.expected_valid_rate))
+    )
+    return mechanism
 
 
 def min_counts_ok(
