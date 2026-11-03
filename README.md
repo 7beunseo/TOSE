@@ -70,32 +70,33 @@ Use `MCAR`, `MAR`, or `MNAR` as the missingness type.
 Default full-model settings use embedding width 64, four heads, two
 observed-set blocks, six target-conditional blocks, batch size 128, at most 600
 epochs, and validation-only early stopping with patience 45. The masked-modeling
-objective uses 25% auxiliary remasking and the fixed loss
-`L_observed + 0.6 * L_remasked`.
+objective uses 25% auxiliary remasking. The relative loss weight is
+`alpha = 0.625`:
 
-## Corrected missingness protocol
+```text
+L_normalized = 0.625 * L_observed + 0.375 * L_remasked
+```
 
-This release corrects two issues found while auditing the research pipeline:
+The implementation uses the proportional coefficients `1.0` and `0.6`, which
+have the same normalized relative weights (`1.0 / 1.6 = 0.625` and
+`0.6 / 1.6 = 0.375`).
 
-1. Earlier mask-generation code appended the original supervised target to the
-   logical feature table. In MAR, that excluded label could be selected as a
-   missingness predictor, and dropping it later could also shift the effective
-   feature missing rate away from 30%.
-2. Earlier MAR/MNAR calibration used concatenated train and test covariates.
-   The public generator fits standardization, coefficients, and intercepts on
-   training rows only. The mechanism is fixed before validation and test are
-   processed, and neither split is used to select mechanism parameters.
+## Missingness protocol
 
-The corrected generator samples the nearest feasible exact number of missing
-logical cells independently in train, validation, and test. Logistic
-probabilities are retained as relative sampling weights. Therefore a requested
-rate `rho` differs from the realized partition rate by at most half a logical
-cell divided by the number of cells in that partition.
+The benchmark generator constructs feature-only MCAR, MAR, and MNAR masks. The
+original supervised target is excluded from the imputation table and does not
+participate in the missingness mechanism.
 
-These corrections change the generated masks. Results produced with archived
-legacy masks are not numerically identical to results from this public
-generator. Using the corrected protocol requires regenerating masks and
-rerunning the affected experiments.
+For MAR and MNAR, standardization statistics, coefficients, and intercepts are
+estimated using training rows only. The resulting mechanism is fixed before it
+is applied to validation and test, and neither partition is used to select its
+parameters. MAR predictor variables remain observed by construction.
+
+The generator samples the nearest feasible exact number of missing logical
+cells independently in train, validation, and test. Logistic probabilities are
+retained as relative sampling weights. Consequently, a requested rate `rho`
+differs from the realized partition rate by at most half a logical cell divided
+by the number of cells in that partition.
 
 ## Tests
 
@@ -111,7 +112,7 @@ rates, and MAR predictor observability.
 - `model.py`: TOSE architecture and ablation paths.
 - `trainer.py`, `losses.py`, `metrics.py`: training and evaluation.
 - `dataset.py`: train/validation/test loading.
-- `data_generation/`: dataset preparation and corrected missingness generation.
+- `data_generation/`: dataset preparation and missingness generation.
 - `tests/`: smoke and data-protocol tests.
 
 ## Reproducibility notes
