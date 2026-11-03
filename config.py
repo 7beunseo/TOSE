@@ -132,6 +132,8 @@ def get_arg_parser() -> argparse.ArgumentParser:
             "no_state_embedding",
             "no_tose_shared_row",
             "uniform_source_aggregation",
+            "shared_target_query",
+            "static_column_attention",
             "uniform_source_no_target_set_sa",
             "no_target_aware_pooling",
             "both_uniform",

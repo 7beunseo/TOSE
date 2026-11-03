@@ -191,14 +191,21 @@ class TOSETrainer:
             "observed1_tose1_all_three_removed",
             "observed1_tose1_no_observed_set_sa",
         }
-        shared_target_query = mode == "observed1_tose1_shared_target_query"
-        static_column_attention = mode == "observed1_tose1_static_column_attention"
+        shared_target_query = mode in {
+            "shared_target_query",
+            "observed1_tose1_shared_target_query",
+        }
+        static_column_attention = mode in {
+            "static_column_attention",
+            "observed1_tose1_static_column_attention",
+        }
         linear_prediction_heads = mode == "linear_prediction_heads"
         uniform_target_pooling = mode in {"no_target_aware_pooling", "both_uniform"}
         state_enabled = mode != "no_state_embedding"
         target_conditioning = mode not in {
             "no_target_conditioning",
             "no_tose_shared_row",
+            "shared_target_query",
             "observed1_tose1_shared_target_query",
         }
 
@@ -240,6 +247,13 @@ class TOSETrainer:
             source_aggregation = "learned_cross_attention"
 
         return {
+            "matched_depth_structural_ablation": mode in {
+                "full",
+                "static_column_attention",
+                "shared_target_query",
+                "uniform_source_aggregation",
+            },
+            "structural_ablation_reference": "full_tose_same_depth",
             "tose_enabled": not no_tose,
             "tose_target_block_count": len(self.model.encoder.target_blocks),
             "observed_set_block_count": len(self.model.encoder.observed_blocks),
@@ -248,6 +262,11 @@ class TOSETrainer:
             "capacity_matched_shared_row_blocks": no_tose,
             "target_query_enabled": not no_tose,
             "shared_target_query_enabled": shared_target_query,
+            "shared_target_query_parameterization": (
+                "mean_of_existing_target_query_seeds"
+                if shared_target_query
+                else "not_applicable"
+            ),
             "target_query_policy": (
                 "shared_learned_query"
                 if shared_target_query
@@ -288,6 +307,8 @@ class TOSETrainer:
                 if static_column_attention
                 else "none_uniform"
                 if uniform_sources
+                else "shared_learned_query_and_observed_row_representations"
+                if shared_target_query
                 else "target_and_observed_row_representations"
                 if not no_tose
                 else "not_applicable"

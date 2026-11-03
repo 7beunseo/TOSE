@@ -79,6 +79,35 @@ L_normalized = 0.625 * L_observed + 0.375 * L_remasked
 
 These coefficients are the default values used directly by the implementation.
 
+## Matched-depth structural ablations
+
+The matched-depth structural-ablation protocol uses the same parameter count, embedding
+width, attention-head count, observed-set depth, target-conditional depth,
+prediction heads, loss, optimizer, remasking policy, and training schedule as
+full TOSE. With the default configuration, every variant has two observed-set
+blocks and six target-conditional blocks. Only the source-weighting path named
+in the final column is changed.
+
+| CLI mode | Paper label | Observed-set blocks | Target blocks | Controlled change |
+|---|---|---:|---:|---|
+| `full` | Full TOSE | 2 | 6 | None |
+| `static_column_attention` | w/o Sample-Adaptive Weighting | 2 | 6 | Attention scores use target/source column identity and do not depend on row values |
+| `shared_target_query` | w/o Target-Specific Weighting | 2 | 6 | The mean of the existing query seeds is passed as one shared query to every target-to-source attention layer; no parameter is added |
+| `uniform_source_aggregation` | w/o Learned Source Weighting | 2 | 6 | Every currently observed source receives weight `1/K` |
+
+Run all four configurations under MCAR, MAR, and MNAR with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/run_matched_depth_structural_ablations.ps1 `
+  -PythonExe python `
+  -DataRoot data `
+  -Ratio 30
+```
+
+Each `report.json` records `observed_set_block_count` and
+`tose_target_block_count`. The structural-ablation tests also fail if any of
+the four default configurations no longer uses the same `2+6` depth.
+
 ## Missingness protocol
 
 The benchmark generator constructs feature-only MCAR, MAR, and MNAR masks. The
@@ -111,6 +140,8 @@ rates, and MAR predictor observability.
 - `trainer.py`, `losses.py`, `metrics.py`: training and evaluation.
 - `dataset.py`: train/validation/test loading.
 - `data_generation/`: dataset preparation and missingness generation.
+- `scripts/run_matched_depth_structural_ablations.ps1`: controlled structural
+  ablation runner using the full-model depth for every variant.
 - `tests/`: smoke and data-protocol tests.
 
 ## Reproducibility notes

@@ -314,6 +314,8 @@ class TargetConditionalObservedSetEncoder(nn.Module):
             "no_state_embedding",
             "no_tose_shared_row",
             "uniform_source_aggregation",
+            "shared_target_query",
+            "static_column_attention",
             "uniform_source_no_target_set_sa",
             "no_target_aware_pooling",
             "both_uniform",
@@ -356,10 +358,6 @@ class TargetConditionalObservedSetEncoder(nn.Module):
             self.register_parameter("query_seed", None)
         else:
             self.query_seed = nn.Parameter(torch.zeros(1, input_dim, embed_dim))
-        if ablation_mode == "observed1_tose1_shared_target_query":
-            self.shared_attention_query = nn.Parameter(torch.zeros(1, 1, embed_dim))
-        else:
-            self.register_parameter("shared_attention_query", None)
         self.register_buffer("feature_ids", torch.arange(input_dim), persistent=False)
         observed_depth = max(1, depth // 2)
         target_depth = max(1, depth + max(0, cross_attn_layers - 1))
@@ -464,8 +462,6 @@ class TargetConditionalObservedSetEncoder(nn.Module):
     def _reset_parameters(self) -> None:
         if self.query_seed is not None:
             nn.init.normal_(self.query_seed, std=0.02)
-        if self.shared_attention_query is not None:
-            nn.init.normal_(self.shared_attention_query, std=0.02)
         nn.init.xavier_uniform_(self.observed_pool_score.weight)
         nn.init.zeros_(self.observed_pool_score.bias)
 
@@ -570,22 +566,34 @@ class TargetConditionalObservedSetEncoder(nn.Module):
             target_state=target_state,
         )
         shared_attention_query = None
-        if self.ablation_mode == "observed1_tose1_shared_target_query":
-            if self.shared_attention_query is None:
-                raise RuntimeError("Shared target query is unavailable for this ablation.")
-            # This learned Q contains no target ID, state, or intermediate target
-            # representation and is therefore identical for every target.
-            shared_attention_query = self.shared_attention_query.expand(batch_size, -1, -1)
+        if self.ablation_mode in {
+            "shared_target_query",
+            "observed1_tose1_shared_target_query",
+        }:
+            # Reuse the full model's query seeds so this ablation adds no
+            # parameters. Their learned mean contains no target ID, state, or
+            # intermediate target representation and is identical for every target.
+            shared_attention_query = self.query_seed.mean(dim=1, keepdim=True).expand(
+                batch_size, -1, -1
+            )
         for block in self.target_blocks:
             target_tokens = block(
                 target_tokens,
                 observed_tokens,
                 observed_bool,
                 use_target_conditioning=self.ablation_mode
-                not in {"no_target_conditioning", "observed1_tose1_shared_target_query"},
+                not in {
+                    "no_target_conditioning",
+                    "shared_target_query",
+                    "observed1_tose1_shared_target_query",
+                },
                 source_aggregation=(
                     "static_column"
-                    if self.ablation_mode == "observed1_tose1_static_column_attention"
+                    if self.ablation_mode
+                    in {
+                        "static_column_attention",
+                        "observed1_tose1_static_column_attention",
+                    }
                     else "uniform"
                     if self.ablation_mode in {
                         "uniform_source_aggregation",
