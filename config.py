@@ -10,6 +10,8 @@ import torch
 REPO_ROOT = Path(__file__).resolve().parent
 DEFAULT_DATA_ROOT = REPO_ROOT / "data"
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "results"
+DEFAULT_OBSERVED_LOSS_WEIGHT = 0.625
+DEFAULT_REMASKED_LOSS_WEIGHT = 0.375
 DEFAULT_DATASETS = [
     "adult",
     "bean",
@@ -153,8 +155,16 @@ def get_arg_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--guided-remask-ratio", type=float, default=0.25)
     parser.add_argument("--guided-remask-temperature", type=float, default=0.5)
-    parser.add_argument("--forward-keep-loss-weight", type=float, default=1.0)
-    parser.add_argument("--forward-aux-loss-weight", type=float, default=0.6)
+    parser.add_argument(
+        "--forward-keep-loss-weight",
+        type=float,
+        default=DEFAULT_OBSERVED_LOSS_WEIGHT,
+    )
+    parser.add_argument(
+        "--forward-aux-loss-weight",
+        type=float,
+        default=DEFAULT_REMASKED_LOSS_WEIGHT,
+    )
     parser.add_argument("--loss-balance-mode", type=str, default="legacy", choices=["legacy", "type_mean"])
     parser.add_argument("--lambda-num", type=float, default=0.5)
     parser.add_argument("--lambda-cat", type=float, default=0.5)

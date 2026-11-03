@@ -77,9 +77,7 @@ objective uses 25% auxiliary remasking. The relative loss weight is
 L_normalized = 0.625 * L_observed + 0.375 * L_remasked
 ```
 
-The implementation uses the proportional coefficients `1.0` and `0.6`, which
-have the same normalized relative weights (`1.0 / 1.6 = 0.625` and
-`0.6 / 1.6 = 0.375`).
+These coefficients are the default values used directly by the implementation.
 
 ## Missingness protocol
 
