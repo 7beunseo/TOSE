@@ -108,6 +108,25 @@ Each `report.json` records `observed_set_block_count` and
 `tose_target_block_count`. The structural-ablation tests also fail if any of
 the four default configurations no longer uses the same `2+6` depth.
 
+## Baseline reproduction
+
+The `baselines/` directory contains the adapters used for ReMasker, PMAE,
+CACTI, GAIN, MIWAE, DSAN, DeepIFSAC, MICE, and MissForest. The adapters pin the
+official neural-model repositories to recorded commits and apply the common
+TOSE split, missingness mask, validation-only checkpoint selection, categorical
+decoding, and metric protocol. Appendix B.4-B.7 settings are executable defaults
+and are checked by automated tests.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File baselines/bootstrap_official_sources.ps1
+powershell -ExecutionPolicy Bypass -File baselines/run_appendix_baseline.ps1 `
+  -Method ReMasker -Mechanism MCAR -Ratio 30
+```
+
+See [baselines/README.md](baselines/README.md) for exact settings, official
+source commits, CACTI embedding preparation, R dependencies, and the scope of
+each mixed-type adaptation.
+
 ## Missingness protocol
 
 The benchmark generator constructs feature-only MCAR, MAR, and MNAR masks. The
@@ -142,6 +161,8 @@ rates, and MAR predictor observability.
 - `data_generation/`: dataset preparation and missingness generation.
 - `scripts/run_matched_depth_structural_ablations.ps1`: controlled structural
   ablation runner using the full-model depth for every variant.
+- `baselines/`: pinned official baseline sources, protocol adapters, and
+  Appendix B.4-B.7 configuration checks.
 - `tests/`: smoke and data-protocol tests.
 
 ## Reproducibility notes

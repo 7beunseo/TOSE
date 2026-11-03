@@ -1,0 +1,7 @@
+-r requirements.txt
+einops
+timm
+tensorflow<2.16
+tensorflow-probability
+transformers==4.37.2
+sentencepiece

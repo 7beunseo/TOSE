@@ -1,0 +1,30 @@
+{
+  "remasker": {
+    "url": "https://github.com/tydusky/remasker",
+    "commit": "69b410819c0d096fab111bb8b0e54c1edd4efcc2"
+  },
+  "pmae": {
+    "url": "https://github.com/normal-kim/PMAE",
+    "commit": "ecd1793f2331bc41d7c48a530ccf26884688cc37"
+  },
+  "cacti": {
+    "url": "https://github.com/sriramlab/CACTI.git",
+    "commit": "b78bce8505611df982d23f7e4832d0877d09cfe3"
+  },
+  "gain": {
+    "url": "https://github.com/jsyoon0823/GAIN.git",
+    "commit": "ed53e6d0be14a8d4ce35eff46449d4047bcb483e"
+  },
+  "miwae": {
+    "url": "https://github.com/nbip/notMIWAE",
+    "commit": "ed90ac39892426eeb8143d5e25393a880754c08b"
+  },
+  "dsan": {
+    "url": "https://github.com/uos-dmlab/Structued-Data-Quality-Analysis",
+    "commit": "655690531a8ac6f8b360f91d508c2572a0bb8461"
+  },
+  "deepifsac": {
+    "url": "https://github.com/mdsamad001/DeepIFSAC",
+    "commit": "06e1107820b0e10718454e87f6363b036a0179c7"
+  }
+}
